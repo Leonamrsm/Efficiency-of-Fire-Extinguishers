@@ -30,6 +30,7 @@ There is a dataset [publicly available](https://www.muratkoklu.com/datasets/vtdh
 4. While carrying out each experiment, the fuel container, at 10 cm distance, was moved forward up to 190 cm by increasing the distance by 10 cm each time.
 5. Along with the fuel container, anemometer and decibel meter were moved forward in the same dimensions.
 6. Fire extinguishing experiments was conducted with 54 different frequency sound waves at each distance and flame size.
-% Throughout the flame extinguishing experiments, the data obtained from each measurement device was recorded and a dataset was created. The dataset includes the features of fuel container size representing the flame size, fuel type, frequency, decibel, distance, airflow and flame extinction. Accordingly, 6 input features and 1 output feature will be used in models.
+
+Throughout the flame extinguishing experiments, the data obtained from each measurement device was recorded and a dataset was created. The dataset includes the features of fuel container size representing the flame size, fuel type, frequency, decibel, distance, airflow and flame extinction. Accordingly, 6 input features and 1 output feature will be used in models.
 
 
