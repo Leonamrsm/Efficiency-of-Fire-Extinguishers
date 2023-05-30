@@ -56,3 +56,20 @@ During the exploratory data analysis several hypotheses were tested. Below are s
 ![](img/H1.png)
 
 From the graphs, it can be seen that as the distance increases, the proportion of cases of failure increase and the proportion of cases of success decrease.
+
+### Hypothesis 2: The sound frequency emitted by the extinguisher is related to its effectiveness (success in extinguishing the fire).
+
+![](img/H2_test.png)
+
+***True:*** As the p-value returned by the Mann-Whitney test is less than 0.05, it is concluded that there is statistical evidence to reject that the distribution of samples between groups is identical.
+
+![](img/H2.png)
+
+It is observed that there are cases of success and failure in the entire frequency range that was evaluated. However, it is observed that the proportion of successful cases have an increasing behavior between 0 and 20Hz and decreasing from 20 Hz.
+
+
+### Hypothesis 5: The distance of the extinguisher from the heat source is related to its effectiveness (success in extinguishing the fire).
+![](img/H5_test.png)
+***True:*** As the p-value returned by the Mann-Whitney test is less than 0.05, it is concluded that there is statistical evidence to reject that the distribut
+![](img/H5.png)
+From the graphs, it can be seen that as the distance increases, the proportion of cases of failure increase and the proportion of cases of success decrease.
