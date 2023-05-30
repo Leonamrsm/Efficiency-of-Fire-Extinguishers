@@ -1,0 +1,961 @@
+---
+title: "Efficiency of Fire Extinguishers"
+output:
+  pdf_document: default
+  html_notebook: default
+  html_document:
+    df_print: paged
+  word_document: default
+---
+
+```{r}
+library(readxl)
+library(tidyverse)
+library(moments)
+library(car)
+library(corrplot)
+library(gridExtra)
+library(Boruta)
+library(caret)
+library(e1071)
+library(ROCR)
+library(nortest)
+library(psych)
+library(vcd)
+```
+
+# Problem description
+
+## Carregando os dados
+
+```{r}
+data <-read_excel("data/Acoustic_Extinguisher_Fire_Dataset.xlsx", sheet="A_E_Fire_Dataset")
+```
+
+
+# 01 - Data Description
+
+## 1.1 Renomear colunas
+
+
+```{r}
+colnames(data) <- c('size', 'fuel', 'distance', 'desibel', 'airflow', 'frequency', 'status')
+colnames(data)
+```
+
+## 1.2 Visualizing the data
+
+```{r}
+head(data)
+```
+
+
+## 1.2 Data Dimension 
+
+```{r}
+print(paste("Number of rows ", nrow(data)))
+print(paste("Number of columns ", ncol(data)))
+```
+
+
+
+## 1.3 Data Types
+
+```{r}
+str(data)
+```
+
+## 1.4 Change Types
+```{r}
+data$status <- as.factor(data$status)
+data$fuel <- as.factor(data$fuel)
+data$size <- factor(data$size, ordered = TRUE)
+str(data)
+```
+
+
+## 1.5 Check NAs
+
+```{r}
+# Row count with complete data
+sum(complete.cases(data))
+```
+
+```{r}
+# Row count with incomplete data
+sum(!complete.cases(data))
+```
+
+## 1.6 Check Balanced Data
+```{r}
+round(100*prop.table(table(data$status)),2)
+```
+
+
+## 1.7 Estatísticas descritivas
+
+```{r}
+# Check the number of unique values in each column
+quantidade_valores_unicos <- sapply(data, function(col) length(unique(col)))
+print(quantidade_valores_unicos)
+rm(quantidade_valores_unicos)
+```
+
+### 1.7.1 Atributos Numericos
+
+```{r}
+
+get_descriptive_analysis <- function(dados){
+
+mean <- apply(dados, 2, mean, na.rm = TRUE)
+std <- apply(dados, 2, sd, na.rm = TRUE)
+min <- apply(dados, 2, min, na.rm = TRUE)
+max <- apply(dados, 2, max, na.rm = TRUE)
+median <- apply(dados, 2, median, na.rm = TRUE)
+quartis <- apply(dados, 2, quantile, probs = c(0.25, 0.75), na.rm = TRUE)
+IQR <- apply(dados, 2, IQR, na.rm = TRUE)
+skew <- apply(dados, 2, skewness, na.rm = TRUE)
+kurtosis <- apply(dados, 2, kurtosis, na.rm = TRUE)
+
+result <- data.frame(min, max, max-min, mean, median, std, skew, kurtosis)
+
+names(result) <- c("min", "max", "range", "mean", "median", "std", "skew", "kurtosis")
+
+return(result)
+}
+
+get_descriptive_analysis(data %>% select_if(is.numeric))
+```
+
+
+
+# 3 - Exploratory Data Analysis
+
+## 3.1 Univariate Analysis
+
+```{r}
+# Plotting boxplots for each numeric variable on a single graph
+data %>% select_if(is.numeric) %>%
+  gather(variable, value ) %>%
+  ggplot( aes(x=value)) +
+  geom_boxplot(fill='steelblue') +
+  facet_wrap(~ variable, ncol = 2, scales = "free")
+```
+There are no numerical data with outliers.
+
+```{r}
+# Plotting histograms for each numeric variable on a single graph
+data %>% select_if(is.numeric) %>%
+  gather(variable, value) %>%
+  ggplot( aes(x=value)) +
+  geom_histogram(fill='steelblue') +
+  facet_wrap(~ variable, ncol = 2, scales = "free")
+```
+
+None of the numeric variables seems to follow a distribution close to normal.
+
+```{r}
+# Set up the figure structure
+par(mar = c(2, 2, 2, 2))  # Set smaller margins
+layout(matrix(1:20, 5, 4, byrow = TRUE))
+
+# Initialize the list to save p-values
+p_values <- list()
+
+for (column in colnames(data)) {
+  if (is.numeric(data[[column]])) {
+    
+    # Calculate the p-value with Anderson-Darling normality test
+    p_value <- ad.test(data[[column]])$p.value
+    
+    # Add the p-value to the list
+    p_values[[column]] <- p_value
+  }
+}
+
+as.data.frame(p_values) %>%
+  gather(variable, 'p_value' ) %>%
+  mutate(rejected_H0 = p_value < 0.05)
+
+rm(p_values, p_value, column)
+```
+
+There is statistically significant evidence to reject the null hypothesis that each of the numeric predictor variables follow a normal distribution.
+
+
+## 3.2 Multivariate Analysis
+
+
+### 3.2.1 Numerical Variables
+
+```{r}
+# Exploring relationships between numerical variables
+pairs.panels(data %>% select_if(is.numeric), method = "spearman")
+```
+
+### 3.2.2 Categorical Variables
+
+```{r}
+
+cat_cols <- sapply(data, is.factor)
+
+nCatAttributes <- length(which(cat_cols))
+
+matriz_assoc <- matrix(0, ncol = nCatAttributes, 
+                       nrow = nCatAttributes, 
+                       dimnames = list(names(data)[which(cat_cols)], names(data)[which(cat_cols)]))
+
+Cat_df <- as.data.frame(data[,which(cat_cols)])
+
+for (i in 1:(nCatAttributes - 1)) {
+  for (j in (i+1):nCatAttributes) {
+    tabela <- table(Cat_df[, i], Cat_df[, j])
+    matriz_assoc[i, j] <- assocstats(tabela)$cramer
+    matriz_assoc[j, i] <- matriz_assoc[i, j]
+  }
+}
+
+diag(matriz_assoc) <- 1
+
+corrplot(matriz_assoc, method = "color", type = "upper", order = "hclust", tl.cex = 0.8, tl.srt = 45, addCoef.col = "black")
+
+rm(Cat_df, matriz_assoc, nCatAttributes, cat_cols, i, j, tabela)
+```
+## 3.2 Bivariate Analysis
+
+
+#### Hypothesis 1: The distance of the extinguisher from the heat source is related to its effectiveness (success in extinguishing the fire).
+
+To verify this hypothesis, the t-Test for two independent samples will first be evaluated, which has the following premises:
+
+- 1. Data are random and representative of the population.
+- 2. The dependent variable is continuous.
+- 3. Both groups are independent (i.e. exhaustive and exclusionary groups).
+- 4. The residuals of the model are normally distributed.
+- 5. The residual variance is homogeneous (principle of homoscedasticity).
+
+For our example in this case study, we will assume as true the
+assumptions 1 to 3 and we will validate assumptions 4 and 5. For assumption 4 we will use
+the Shapiro-Wilk Test and for assumption 5 we will use the F Test, in case the data in each group is normally distributed.
+
+```{r}
+
+# Shapiro-Wilk Normality Test in each traction group
+# H0: Data is normally distributed
+# H1: Data is not normally distributed
+
+# Subsampling of groups, as there is a maximum limitation of 5000 samples
+group_0 <- data$distance[data$status == 0]
+group_0_sample <- sample(group_0, min(5000, length(group_0)))
+
+group_1 <- data$distance[data$status == 1]
+group_1_sample <- sample(group_1, min(5000, length(group_1)))
+
+# Shapiro-Wilk normality test for subsamples
+shapiro_0 <- shapiro.test(group_0_sample)
+shapiro_1 <- shapiro.test(group_1_sample)
+
+print(shapiro_0)
+print(shapiro_1)
+
+rm(group_0, group_0_sample, group_1, group_1_sample, shapiro_0, shapiro_1)
+
+```
+
+As the p-value is less than 0.05, there is enough statistical evidence to reject the null hypothesis of normality of the data in each group. Thus, the assumption of normality of the residuals is discarded. As the assumption of normality is not met, it is recommended to use a non-parametric test to compare samples, such as the Mann-Whitney test.
+
+
+```{r}
+# Mann-Whitney Test
+# H0 (Null Hypothesis): The distributions of the two independent samples are identical.
+# HA (Alternative Hypothesis): The distributions of the two independent samples are not identical.
+
+group_0 <- data$distance[data$status == 0]
+group_1 <- data$distance[data$status == 1]
+
+wilcox_test_result <- wilcox.test(group_0, group_1)
+print(wilcox_test_result)
+
+rm(group_0, group_1, wilcox_test_result)
+```
+
+Hypothesis 1 is true. As the p-value returned by the Mann-Whitney test is less than 0.05, it is concluded that there is statistical evidence to reject that the distribution of samples between groups is identical.
+
+The graphs below were generated to visualize the relationship between the variables 'distance' and 'status'.
+
+```{r}
+p1 <- ggplot(data, aes(x = distance, fill = factor(status))) +
+  geom_density(alpha = 0.5) +
+  labs(fill = "Status") +
+  theme(legend.position = "top")
+
+p2 <- ggplot(data, aes(x = factor(status), y = distance, fill = factor(status))) +
+  geom_boxplot() +
+  labs(x = "Status", y = "Distance", fill = "Status") +
+  theme(legend.position = "none")
+
+p3 <- ggplot(data, aes(x = distance, fill = factor(status))) +
+  geom_bar(position = "fill") +
+  labs(x = "Distance", y = "Proportion", fill = "Status") +
+  theme(legend.position = "none")
+
+p4 <- ggplot(data, aes(x = distance, y = factor(status), color = factor(status))) +
+  geom_point() +
+  labs(x = "Distance", y = "Status", color = "Status") +
+  theme(legend.position = "none")
+
+# Arrange subplots side by side
+grid.arrange(p1, p2, p3, p4, ncol = 2, top = guide_legend(title = "Status"))
+
+rm(p1, p2, p3, p4)
+```
+From the graphs, it can be seen that as the distance increases, the proportion of cases of failure increase and the proportion of cases of success decrease.
+
+
+#### Hypothesis 2: The sound frequency emitted by the extinguisher is related to its effectiveness (success in extinguishing the fire).
+
+To verify this hypothesis, the t-Test for two independent samples (success=0 and success=1) will first be evaluated.
+
+But before carrying out the t-test, the assumption of normality must be evaluated.
+
+```{r}
+
+# Shapiro-Wilk Normality Test in each traction group
+# H0: Data is normally distributed
+# H1: Data is not normally distributed
+
+# Subsampling of groups, as there is a maximum limitation of 5000 samples
+group_0 <- data$frequency[data$status == 0]
+group_0_sample <- sample(group_0, min(5000, length(group_0)))
+
+group_1 <- data$frequency[data$status == 1]
+group_1_sample <- sample(group_1, min(5000, length(group_1)))
+
+# Shapiro-Wilk normality test for subsamples
+shapiro_0 <- shapiro.test(group_0_sample)
+shapiro_1 <- shapiro.test(group_1_sample)
+
+print(shapiro_0)
+print(shapiro_1)
+
+rm(group_0, group_0_sample, group_1, group_1_sample, shapiro_0, shapiro_1)
+
+```
+As the p-value is less than 0.05, there is enough statistical evidence to reject the null hypothesis of normality of the data in each group. Thus, the assumption of normality of the residuals is discarded. As the assumption of normality is not met, it is recommended to use a non-parametric test to compare samples, such as the Mann-Whitney test.
+
+```{r}
+# Mann-Whitney Test
+# H0 (Null Hypothesis): The distributions of the two independent samples are identical.
+# HA (Alternative Hypothesis): The distributions of the two independent samples are not identical.
+
+group_0 <- data$frequency[data$status == 0]
+group_1 <- data$frequency[data$status == 1]
+
+wilcox_test_result <- wilcox.test(group_0, group_1)
+print(wilcox_test_result)
+
+rm(group_0, group_1, wilcox_test_result)
+```
+
+Hypothesis 2 is true. As the p-value returned by the Mann-Whitney test is less than 0.05, it is concluded that there is statistical evidence to reject that the distribution of samples between groups is identical.
+
+The graphs below were generated to visualize the relationship between the variables 'frequency' and 'status'.
+
+```{r}
+p1 <- ggplot(data, aes(x = frequency, fill = factor(status))) +
+  geom_density(alpha = 0.5) +
+  labs(fill = "Status") +
+  theme(legend.position = "top")
+
+p2 <- ggplot(data, aes(x = factor(status), y = frequency, fill = factor(status))) +
+  geom_boxplot() +
+  labs(x = "Status", y = "Frequency", fill = "Status") +
+  theme(legend.position = "none")
+
+p3 <- ggplot(data, aes(x = frequency, fill = factor(status))) +
+  geom_bar(position = "fill") +
+  labs(x = "Frequency", y = "Proportion", fill = "Status") +
+  theme(legend.position = "none")
+
+p4 <- ggplot(data, aes(x = frequency, y = factor(status), color = factor(status))) +
+  geom_point() +
+  labs(x = "Frequency", y = "Status", color = "Status") +
+  theme(legend.position = "none")
+
+# Arrange subplots side by side
+grid.arrange(p1, p2, p3, p4, ncol = 2, top = guide_legend(title = "Status"))
+
+rm(p1, p2, p3, p4)
+```
+It is observed that there are cases of success and failure in the entire frequency range that was evaluated. However, it is observed that the proportion of successful cases have an increasing behavior between 0 and 20Hz and decreasing from 20 Hz.
+
+#### Hypothesis 3: The amplitude of the sound waves, measured in db, emitted by the extinguisher, is related to its effectiveness.
+
+To verify this hypothesis, the t-Test for two independent samples (success=0 and success=1) will first be evaluated.
+
+But before carrying out the t-test, the assumption of normality must be evaluated.
+
+```{r}
+# Shapiro-Wilk Normality Test in each traction group
+# H0: Data is normally distributed
+# H1: Data is not normally distributed
+
+# Subsampling of groups, as there is a maximum limitation of 5000 samples
+group_0 <- data$desibel[data$status == 0]
+group_0_sample <- sample(group_0, min(5000, length(group_0)))
+
+group_1 <- data$desibel[data$status == 1]
+group_1_sample <- sample(group_1, min(5000, length(group_1)))
+
+# Shapiro-Wilk normality test for subsamples
+shapiro_0 <- shapiro.test(group_0_sample)
+shapiro_1 <- shapiro.test(group_1_sample)
+
+print(shapiro_0)
+print(shapiro_1)
+
+rm(group_0, group_0_sample, group_1, group_1_sample, shapiro_0, shapiro_1)
+```
+As the p-value is less than 0.05, there is enough statistical evidence to reject the null hypothesis of normality of the data in each group. Thus, the assumption of normality of the residuals is discarded. As the assumption of normality is not met, it is recommended to use a non-parametric test to compare samples, such as the Mann-Whitney test.
+
+```{r}
+# Mann-Whitney Test
+# H0 (Null Hypothesis): The distributions of the two independent samples are identical.
+# HA (Alternative Hypothesis): The distributions of the two independent samples are not identical.
+group_0 <- data$desibel[data$status == 0]
+group_1 <- data$desibel[data$status == 1]
+
+wilcox_test_result <- wilcox.test(group_0, group_1)
+print(wilcox_test_result)
+
+rm(group_0, group_1, wilcox_test_result)
+```
+Hypothesis 3 is true. As the p-value returned by the Mann-Whitney test is less than 0.05, it is concluded that there is statistical evidence to reject that the distribution of samples between groups is identical.
+
+The graphs below were generated to visualize the relationship between the variables 'desibel' and 'status'.
+
+```{r}
+p1 <- ggplot(data, aes(x = desibel, fill = factor(status))) +
+  geom_density(alpha = 0.5) +
+  labs(fill = "Status") +
+  theme(legend.position = "top")
+
+p2 <- ggplot(data, aes(x = factor(status), y = desibel, fill = factor(status))) +
+  geom_boxplot() +
+  labs(x = "Status", y = "Amplitude (db)", fill = "Status") +
+  theme(legend.position = "none")
+
+p3 <- ggplot(data, aes(x = desibel, fill = factor(status))) +
+  geom_bar(position = "fill") +
+  labs(x = "Amplitude (db)", y = "Proportion", fill = "Status") +
+  theme(legend.position = "none")
+
+p4 <- ggplot(data, aes(x = desibel, y = factor(status), color = factor(status))) +
+  geom_point() +
+  labs(x = "Amplitude (db)", y = "Status", color = "Status") +
+  theme(legend.position = "none")
+
+# Arrange subplots side by side
+grid.arrange(p1, p2, p3, p4, ncol = 2, top = guide_legend(title = "Status"))
+
+rm(p1, p2, p3, p4)
+```
+It is observed that for amplitudes below 75 db there are no cases of success and for amplitudes above 110 db there are no cases of failure. The proportion of successful cases grows from 75 db and reaches a peak around 90 db. Between 90 and 98 db the success rate drops and after 98 db it grows.
+
+#### Hypothesis 4: The air flow velocity, measured in m/s, is related to the effectiveness of the extinguisher.
+
+To verify this hypothesis, the t-Test for two independent samples (success=0 and success=1) will first be evaluated.
+
+But before carrying out the t-test, the assumption of normality must be evaluated.
+
+```{r}
+# Shapiro-Wilk Normality Test in each traction group
+# H0: Data is normally distributed
+# H1: Data is not normally distributed
+
+# Subsampling of groups, as there is a maximum limitation of 5000 samples
+group_0 <- data$airflow[data$status == 0]
+group_0_sample <- sample(group_0, min(5000, length(group_0)))
+
+group_1 <- data$airflow[data$status == 1]
+group_1_sample <- sample(group_1, min(5000, length(group_1)))
+
+# Shapiro-Wilk normality test for subsamples
+shapiro_0 <- shapiro.test(group_0_sample)
+shapiro_1 <- shapiro.test(group_1_sample)
+
+print(shapiro_0)
+print(shapiro_1)
+
+rm(group_0, group_0_sample, group_1, group_1_sample, shapiro_0, shapiro_1)
+```
+As the p-value is less than 0.05, there is enough statistical evidence to reject the null hypothesis of normality of the data in each group. Thus, the assumption of normality of the residuals is discarded. As the assumption of normality is not met, it is recommended to use a non-parametric test to compare samples, such as the Mann-Whitney test.
+
+```{r}
+# Mann-Whitney Test
+# H0 (Null Hypothesis): The distributions of the two independent samples are identical.
+# HA (Alternative Hypothesis): The distributions of the two independent samples are not identical.
+group_0 <- data$airflow[data$status == 0]
+group_1 <- data$airflow[data$status == 1]
+
+wilcox_test_result <- wilcox.test(group_0, group_1)
+print(wilcox_test_result)
+
+rm(group_0, group_1, wilcox_test_result)
+```
+
+Hypothesis 4 is true. As the p-value returned by the Mann-Whitney test is less than 0.05, it is concluded that there is statistical evidence to reject that the distribution of samples between groups is identical.
+
+The graphs below were generated to visualize the relationship between the variables 'airflow' and 'status'.
+
+```{r}
+p1 <- ggplot(data, aes(x = airflow, fill = factor(status))) +
+  geom_density(alpha = 0.5) +
+  labs(fill = "Status") +
+  theme(legend.position = "top")
+
+p2 <- ggplot(data, aes(x = factor(status), y = airflow, fill = factor(status))) +
+  geom_boxplot() +
+  labs(x = "Status", y = "Airflow (m/s)", fill = "Status") +
+  theme(legend.position = "none")
+
+p3 <- ggplot(data, aes(x = airflow, fill = factor(status))) +
+  geom_bar(position = "fill") +
+  labs(x = "Airflow (m/s)", y = "Proportion", fill = "Status") +
+  theme(legend.position = "none")
+
+p4 <- ggplot(data, aes(x = airflow, y = factor(status), color = factor(status))) +
+  geom_point() +
+  labs(x = "Airflow (m/s)", y = "Status", color = "Status") +
+  theme(legend.position = "none")
+
+# Arrange subplots side by side
+grid.arrange(p1, p2, p3, p4, ncol = 2, top = guide_legend(title = "Status"))
+
+rm(p1, p2, p3, p4)
+```
+It is observed that as the airflow velocity increases, the proportion of successful in extinguishing the fire increases.
+
+
+#### Hypothesis 5: There is no relatioship between the fuel used to create the flame and the effectiveness of the extinguisher.
+
+To validate a hypothesis, the chi-squared test will be performed.
+
+
+```{r}
+# chi-squared Test
+# H0 - There is no relationship between x and y
+# HA - x and y are related
+
+# Create a contingency table with the observed frequencies
+contingency_table <- table(data$fuel, data$status)
+
+# Perform the chi-squares test
+result <- chisq.test(contingency_table)
+
+# Show the result of test
+print(result)
+
+rm(contingency_table, result)
+```
+
+Hypothesis 5 is false. As the p-value returned by the chi-squared test is less than 0.05, it is concluded that there is statistical evidence to confirm that 'status' and 'fuel' are related.
+
+The graphs below were generated to visualize the relationship between the variables 'fuel' and 'status'.
+```{r}
+p1 <- ggplot(data, aes(x = factor(fuel), fill = factor(status))) +
+  geom_bar(position = "dodge") +
+  labs(x = "Fuel", y = "Count", fill = "Status") +
+  theme(legend.position = "top")
+
+p2 <- ggplot(data, aes(x = factor(fuel), fill = factor(status))) +
+  geom_bar(position = "fill") +
+  labs(x = "Fuel", y = "Proportion", fill = "Status") +
+  theme(legend.position = "top")
+
+# Arrange subplots side by side
+grid.arrange(p1, p2, ncol = 2, top = guide_legend(title = "Status"))
+
+rm(p1, p2)
+```
+- Gasoline and lpg have more success than failures. Kerosene and Thinner present more cases of failure than success in extinguishing fires.
+
+#### Hypothesis 6: There is no relatioship between the size of liquid fuel cans used to create the flame and the effectiveness of the extinguisher.
+
+To validate a hypothesis, the chi-squared test will be performed.
+
+```{r}
+
+# chi-squared Test
+# H0 - There is no relationship between x and y
+# HA - x and y are related
+
+# Create a contingency table with the observed frequencies
+contingency_table <- table(data$size, data$status)
+
+# Perform the chi-squares test
+result <- chisq.test(contingency_table)
+
+# Show the result of test
+print(result)
+
+rm(contingency_table, result)
+```
+Hypothesis 6 is false. As the p-value returned by the chi-squared test is less than 0.05, it is concluded that there is statistical evidence to confirm that 'status' and 'size' are related.
+
+The graphs below were generated to visualize the relationship between the variables 'size' and 'status'.
+
+```{r}
+p1 <- ggplot(data, aes(x = factor(size), fill = factor(status))) +
+  geom_bar(position = "dodge") +
+  labs(x = "Size", y = "Count", fill = "Status") +
+  theme(legend.position = "top")
+
+p2 <- ggplot(data, aes(x = factor(size), fill = factor(status))) +
+  geom_bar(position = "fill") +
+  labs(x = "Size", y = "Proportion", fill = "Status") +
+  theme(legend.position = "top")
+
+# Arrange subplots side by side
+grid.arrange(p1, p2, ncol = 2, top = guide_legend(title = "Status"))
+
+rm(p1, p2)
+```
+
+- It is observed that as the size of the fuel cans increases, there is a tendency for the failure rate to increase and the success rate to decrease in extinguishing the fire. However, this pattern isn't observed for sizes 6 and 7, which have 1026 records each, while for sizes 1 to 5 there are 3078 records each.
+
+# 5 -Data Preparation
+
+## 5.1 Division of Data into Training and Test Sets
+
+```{r}
+# Set a seed for reproducibility
+set.seed(123)  
+indexes <- createDataPartition(data$status, p = 0.8, list = FALSE)
+train_data <- data[indexes, ]
+test_data <- data[-indexes, ]
+
+rm(indexes)
+```
+
+
+## 5.2 Rescaling
+
+According to the univariate analysis of numerical variables (section 3.1), no variable has a normal or close to normal distribution. Min-Max normalization is more suitable when the data do not follow a normal distribution, thus preventing the data distribution from being distorted.
+
+```{r}
+
+# Gets all numeric column names
+num_cols <- names(train_data %>% select_if(is.numeric))
+
+# Create the pre process object
+preprocess_obj <- preProcess(train_data[, num_cols], method = "range")
+
+# Apply the MinMax transformation to the training data
+num_train_data_normalized <- predict(preprocess_obj, train_data[, num_cols])
+
+# Apply the MinMax transformation to the test data
+num_test_data_normalized <- predict(preprocess_obj, test_data[, num_cols])
+
+rm(num_cols, preprocess_obj)
+
+```
+
+## 5.3 Encoding
+
+
+```{r}
+# Create an object dummyVars (fuel col)
+dummy_obj <- dummyVars(~ fuel, data = train_data)
+
+# Aplly one-hot encoding to train data
+fuel_train_encoded <- as.data.frame(predict(dummy_obj, newdata = train_data))
+
+# Aplly one-hot encoding to test data
+fuel_test_encoded <- as.data.frame(predict(dummy_obj, newdata = test_data))
+
+rm(dummy_obj)
+```
+
+## 5.4 Concatenation
+
+```{r}
+# Concatenates the training data
+train_data <- cbind(num_train_data_normalized,
+                    fuel_train_encoded,
+                    train_data[, c('size', 'status')])
+
+# Concatenates the test data
+test_data <- cbind(num_test_data_normalized,
+                    fuel_test_encoded,
+                    test_data[, c('size', 'status')])
+
+rm(num_train_data_normalized, fuel_train_encoded)
+rm(num_test_data_normalized, fuel_test_encoded)
+
+# Check col names
+names(train_data)
+```
+
+# 6 - Dimensionality reduction
+
+## 6.1 PCA
+
+```{r}
+# Remove the dependent variable from the training dataset
+train_data_pca <- subset(train_data, select = -status)
+test_data_pca <- subset(test_data, select = -status)
+
+# Convert variable "size" to numeric with ordinal encoding
+train_data_pca$size <- as.numeric(train_data_pca$size)
+test_data_pca$size <- as.numeric(test_data_pca$size)
+
+# Application of the PCA
+pca_model <- prcomp(train_data_pca, center = FALSE, scale = FALSE)
+
+# Analysis of results
+summary(pca_model)
+plot(pca_model, type = "l", main = "Variance Explained")
+
+```
+```{r}
+# Get the cumulative variance ratio
+cumulative_variance <- cumsum(pca_model$sdev^2) / sum(pca_model$sdev^2)
+
+# Find the minimum number of components that explain 99.9% of the variance
+num_components <- min(which(cumulative_variance >= 0.999))
+
+# Get the transformed data
+train_data_pca <- as.data.frame(predict(pca_model, newdata = train_data_pca)[, 1:num_components])
+test_data_pca <- as.data.frame(predict(pca_model, newdata = test_data_pca)[, 1:num_components])
+
+train_data_pca <- cbind(train_data_pca, train_data$status)
+test_data_pca <- cbind(test_data_pca, test_data$status)
+
+names(train_data_pca) <- c("PC1", "PC2", "PC3", "PC4", "PC5", "PC6", "PC7", "status")
+names(test_data_pca) <- c("PC1", "PC2", "PC3", "PC4", "PC5", "PC6", "PC7", "status")
+
+print(paste('The dimensionality reduction of the data was from', ncol(train_data)-1, 'to', ncol(train_data_pca)-1, 'columns'))
+```
+
+
+# 07 - Modelagem de Machine Learning
+
+## 7.1 - Random Model - Baseline
+
+```{r}
+# Generating random predictions
+y_hat <- as.factor(sample(c(0,1), size = nrow(test_data_pca), replace = TRUE))
+
+# Computing confusion matrix
+cm_baseline <- confusionMatrix(test_data_pca$status, y_hat, mode = "prec_recall", positive = "1")
+
+cm_baseline
+```
+
+## 7.2 - Logistic Regression
+
+```{r}
+#  Cross validation with 5 folds
+ctrl <- trainControl(method = "cv", number = 5)
+
+# Train model
+model_lr  <- train(status ~ ., data = train_data_pca, method = "glm", trControl = ctrl)
+
+# prediction
+yhat_lr = predict(model_lr, newdata = test_data_pca)
+
+# Computing confusion matrix
+cm_glm <- confusionMatrix(test_data_pca$status, yhat_lr, mode = "prec_recall", positive = "1")
+cm_glm
+```
+
+## 7.3 - Decision Tree
+
+```{r}
+#  Cross validation with 5 folds
+ctrl <- trainControl(method = "cv", number = 5)
+
+# Treinar o modelo usando o método rpart, avalaiando 3 valores diferentes de
+# custo de complexidade,
+model_dt  <- train(status ~ ., data = train_data_pca, method = "rpart", trControl = ctrl, tuneLength = 10)
+
+print(model_dt)
+plot(model_dt)
+```
+
+
+```{r}
+# prediction
+yhat_dt = predict(model_dt, newdata = test_data_pca)
+
+# Computing confusion matrix
+cm_rpart <- confusionMatrix(test_data_pca$status, yhat_dt, mode = "prec_recall", positive = "1")
+cm_rpart
+```
+
+## 7.4 - K-Nearest Neighbors 
+
+```{r}
+#  Cross validation with 5 folds
+ctrl <- trainControl(method = "cv", number = 5)
+
+#Train the model using 10 different values of os neighbors, chosen automatically
+model_knn  <- train(status ~ ., data = train_data_pca, method = "knn", trControl = ctrl, tuneLength = 10)
+
+print(model_knn$finalModel)
+plot(model_knn)
+
+```
+
+```{r}
+# prediction
+yhat_knn = predict(model_knn, newdata = test_data_pca)
+
+# Computing confusion matrix
+cm_knn <- confusionMatrix(test_data_pca$status, yhat_knn, mode = "prec_recall", positive = "1")
+cm_knn
+```
+
+## 7.5 - Random Forest 
+
+```{r}
+# Cross validation with 5 folds
+ctrl <- trainControl(method = "cv", number = 5)
+
+# Train the model using 10 different neighborhood count values
+model_rf  <- train(status ~ ., data = train_data_pca, method = "rf", trControl = ctrl, tuneLength = 10)
+
+print(model_knn$finalModel)
+plot(model_knn)
+```
+
+```{r}
+# prediction
+yhat_rf = predict(model_rf, newdata = test_data_pca)
+
+# Computing confusion matrix
+cm_rf <- confusionMatrix(test_data_pca$status, yhat_rf, mode = "prec_recall", positive = "1")
+cm_rf
+```
+
+## 7.6 - Neural Network - 1 Hidden Layer
+```{r}
+#  Cross validation with 5 folds
+ctrl <- trainControl(method = "cv", number = 5, verbose = FALSE)
+
+# Train the model using 5 different values for the regularization factor and 5 values
+# different neurons in the hidden layer, chosen automatically.
+model_nnet <- train(status ~ ., data = train_data_pca, method = "nnet", trControl = ctrl, tuneLength=5)
+
+plot(model_nnet)
+print(model_nnet)
+```
+
+```{r}
+# prediction
+yhat_nnet = predict(model_nnet, newdata = test_data_pca)
+
+# Computing confusion matrix
+cm_nnet <- confusionMatrix(test_data_pca$status, yhat_nnet, mode = "prec_recall", positive = "1")
+cm_nnet
+```
+
+
+## 7.7 - XGBoost
+
+```{r}
+#  Cross validation with 5 folds
+ctrl <- trainControl(method = "cv", number = 5, verbose = FALSE)
+
+# Train the model using 5 different values for each hyperparameter. The 5 values are chosen automatically
+model_xgbTree <- train(status ~ ., data = train_data_pca, method = "xgbTree", trControl = ctrl, tuneLength=5)
+
+plot(model_xgbTree)
+print(model_xgbTree)
+```
+```{r}
+# prediction
+yhat_xgbTree = predict(model_xgbTree, newdata = test_data_pca)
+
+# Computing confusion matrix
+cm_xgbTree <- confusionMatrix(test_data_pca$status, yhat_xgbTree, mode = "prec_recall", positive = "1")
+cm_xgbTree
+```
+
+## 7.8 Compare Model's Performance
+
+```{r}
+# Calculate predicted probabilities for each model in a test dataset
+pred_model1 <- predict(model_lr, newdata = test_data_pca, type = "prob")
+pred_model2 <- predict(model_dt, newdata = test_data_pca, type = "prob")
+pred_model3 <- predict(model_knn, newdata = test_data_pca, type = "prob")
+pred_model4 <- predict(model_rf, newdata = test_data_pca, type = "prob")
+pred_model5 <- predict(model_nnet, newdata = test_data_pca, type = "prob")
+pred_model6 <- predict(model_xgbTree, newdata = test_data_pca, type = "prob")
+
+# Create prediction objects for each model
+pred_model1 <- prediction(pred_model1[, "1"], test_data$status)
+pred_model2 <- prediction(pred_model2[, "1"], test_data$status)
+pred_model3 <- prediction(pred_model3[, "1"], test_data$status)
+pred_model4 <- prediction(pred_model4[, "1"], test_data$status)
+pred_model5 <- prediction(pred_model5[, "1"], test_data$status)
+pred_model6 <- prediction(pred_model6[, "1"], test_data$status)
+
+# Calculate performance metrics for each model
+perf_model1 <- performance(pred_model1, "tpr", "fpr")
+perf_model2 <- performance(pred_model2, "tpr", "fpr")
+perf_model3 <- performance(pred_model3, "tpr", "fpr")
+perf_model4 <- performance(pred_model4, "tpr", "fpr")
+perf_model5 <- performance(pred_model5, "tpr", "fpr")
+perf_model6 <- performance(pred_model6, "tpr", "fpr")
+
+
+# Plot the overlapping ROC curves
+plot(perf_model1, col = "blue", main = "ROC Curve")
+plot(perf_model2, col = "red", add = TRUE)
+plot(perf_model3, col = "green", add = TRUE)
+plot(perf_model4, col = "orange", add = TRUE)
+plot(perf_model5, col = "cyan", add = TRUE)
+plot(perf_model6, col = "violet", add = TRUE)
+
+# Calculate AUC values
+auc_model1 <- performance(pred_model1, "auc")@y.values[[1]]
+auc_model2 <- performance(pred_model2, "auc")@y.values[[1]]
+auc_model3 <- performance(pred_model3, "auc")@y.values[[1]]
+auc_model4 <- performance(pred_model4, "auc")@y.values[[1]]
+auc_model5 <- performance(pred_model5, "auc")@y.values[[1]]
+auc_model6 <- performance(pred_model6, "auc")@y.values[[1]]
+
+# Add legend with AUC values
+legend("bottomright", legend = c(paste("Logistic Regression' (AUC =", round(auc_model1, 3), ")"),
+                                 paste("Decision Tree (AUC =", round(auc_model2, 3), ")"),
+                                 paste("k-NN (AUC =", round(auc_model3, 3), ")"),
+                                 paste("Random Forest 4 (AUC =", round(auc_model4, 3), ")"),
+                                 paste("Neural Network (AUC =", round(auc_model5, 3), ")"),
+                                 paste("XGBoost (AUC =", round(auc_model6, 3), ")")),
+       col = c("blue", "red", "green", "orange", "cyan", "violet"), lwd = 2)
+
+```
+
+
+
+```{r}
+# Set the number of decimal places to 3
+options(digits = 3)
+
+modelNames <- c('Logistic Regression', 'Decision Tree', 'K-Nearest Neighbors', 'Random Forest ', 'Neural Network - 1 Hidden Layer', 'XGBoost')
+accuracies <- c(cm_glm$overall[1], cm_rpart$overall[1], cm_knn$overall[1], cm_rf$overall[1], cm_nnet$overall[1], cm_xgbTree$overall[1])
+f1_scores <- c(cm_glm$byClass[7], cm_rpart$byClass[7], cm_knn$byClass[7], cm_rf$byClass[7], cm_nnet$byClass[7], cm_xgbTree$byClass[7])
+precisions <- c(cm_glm$byClass[5], cm_rpart$byClass[5], cm_knn$byClass[5], cm_rf$byClass[5], cm_nnet$byClass[5], cm_xgbTree$byClass[5])
+recalls <- c(cm_glm$byClass[6], cm_rpart$byClass[6], cm_knn$byClass[6], cm_rf$byClass[6], cm_nnet$byClass[6], cm_xgbTree$byClass[6])
+AUCs <- c(auc_model1, auc_model2, auc_model3, auc_model4, auc_model5, auc_model6)
+data.frame('Model Name' = modelNames,
+           'Accuracy' = accuracies,
+           'F1-Score' = f1_scores,
+           'Precision' = precisions,
+           'Recall' = recalls,
+           'AUC' = AUCs)
+```
+
+
