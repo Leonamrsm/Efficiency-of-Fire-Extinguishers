@@ -48,7 +48,9 @@ In order to solve this challenge, the work went along the following steps:
 During the exploratory data analysis several hypotheses were tested. Below are some of the hypotheses that were tested:
 
 - **Hypothesis 1:** The distance of the extinguisher from the heat source is related to its effectiveness (success in extinguishing the fire).
-   
+![](img/H1_test.png)
+
+***True:*** As the p-value returned by the Mann-Whitney test is less than 0.05, it is concluded that there is statistical evidence to reject that the distribution of samples between groups is identical.
 
 ![](img/H1.png)
 
