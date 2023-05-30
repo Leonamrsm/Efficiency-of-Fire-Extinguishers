@@ -20,3 +20,9 @@ These systems offer several advantages compared to conventional fire-extinguishi
 5. Efficiency in confined spaces: Sound wave fire-extinguishing systems can be particularly effective in confined spaces where traditional methods may be more challenging to apply.
 
 It's important to note that sound wave fire-extinguishing systems are still undergoing research and development. While they show promise, further studies and testing are needed to validate their effectiveness in different fire scenarios and environments. Additionally, regulations and standards need to be established to ensure their safe and reliable implementation.
+
+In this sense, it would be interesting to have a Ml model capable of classifying whether a fire extinguishing system using sound waves can extinguish fire, given certain conditions. 
+
+There is a dataset [publicly available](https://www.muratkoklu.com/datasets/vtdhnd07.php), which provides the result of several experiments carried out with sound wave fire extinguishing systems.
+
+
