@@ -68,8 +68,12 @@ From the graphs, it can be seen that as the distance increases, the proportion o
 It is observed that there are cases of success and failure in the entire frequency range that was evaluated. However, it is observed that the proportion of successful cases have an increasing behavior between 0 and 20Hz and decreasing from 20 Hz.
 
 
-### Hypothesis 5: The distance of the extinguisher from the heat source is related to its effectiveness (success in extinguishing the fire).
+### Hypothesis 5: There is no relatioship between the fuel used to create the flame and the effectiveness of the extinguisher.
+
 ![](img/H5_test.png)
-***True:*** As the p-value returned by the Mann-Whitney test is less than 0.05, it is concluded that there is statistical evidence to reject that the distribut
+
+***False:*** As the p-value returned by the chi-squared test is less than 0.05, it is concluded that there is statistical evidence to confirm that 'status' and 'fuel' are related.
+
 ![](img/H5.png)
-From the graphs, it can be seen that as the distance increases, the proportion of cases of failure increase and the proportion of cases of success decrease.
+
+From the graphs, it can be seen that Gasoline and lpg have more success than failures. Kerosene and Thinner present more cases of failure than success in extinguishing fires.
