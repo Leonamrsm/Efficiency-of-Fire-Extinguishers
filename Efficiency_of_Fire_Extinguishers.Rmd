@@ -26,7 +26,9 @@ library(vcd)
 
 # Problem description
 
-## Carregando os dados
+There is a dataset [publicly available](https://www.muratkoklu.com/datasets/vtdhnd07.php), which provides the result of several experiments carried out with sound wave fire extinguishing systems. The objective of this work is to build a machine learning model capable of classifying whether a fire extinguishing system using sound waves is capable or not of extinguishing a heat source.
+
+## Loading the Data
 
 ```{r}
 data <-read_excel("data/Acoustic_Extinguisher_Fire_Dataset.xlsx", sheet="A_E_Fire_Dataset")
@@ -35,7 +37,7 @@ data <-read_excel("data/Acoustic_Extinguisher_Fire_Dataset.xlsx", sheet="A_E_Fir
 
 # 01 - Data Description
 
-## 1.1 Renomear colunas
+## 1.1 Rename Columns
 
 
 ```{r}
@@ -92,7 +94,7 @@ round(100*prop.table(table(data$status)),2)
 ```
 
 
-## 1.7 Estatísticas descritivas
+## 1.7 descriptive Statistics
 
 ```{r}
 # Check the number of unique values in each column
@@ -101,7 +103,7 @@ print(quantidade_valores_unicos)
 rm(quantidade_valores_unicos)
 ```
 
-### 1.7.1 Atributos Numericos
+### 1.7.1 Numerical Attributes
 
 ```{r}
 
@@ -126,12 +128,9 @@ return(result)
 
 get_descriptive_analysis(data %>% select_if(is.numeric))
 ```
+# 2 - Exploratory Data Analysis
 
-
-
-# 3 - Exploratory Data Analysis
-
-## 3.1 Univariate Analysis
+## 2.1 Univariate Analysis
 
 ```{r}
 # Plotting boxplots for each numeric variable on a single graph
@@ -183,17 +182,17 @@ rm(p_values, p_value, column)
 There is statistically significant evidence to reject the null hypothesis that each of the numeric predictor variables follow a normal distribution.
 
 
-## 3.2 Multivariate Analysis
+## 2.2 Multivariate Analysis
 
 
-### 3.2.1 Numerical Variables
+### 2.2.1 Numerical Variables
 
 ```{r}
 # Exploring relationships between numerical variables
 pairs.panels(data %>% select_if(is.numeric), method = "spearman")
 ```
 
-### 3.2.2 Categorical Variables
+### 2.2.2 Categorical Variables
 
 ```{r}
 
@@ -221,7 +220,7 @@ corrplot(matriz_assoc, method = "color", type = "upper", order = "hclust", tl.ce
 
 rm(Cat_df, matriz_assoc, nCatAttributes, cat_cols, i, j, tabela)
 ```
-## 3.2 Bivariate Analysis
+## 2.3 Bivariate Analysis
 
 
 #### Hypothesis 1: The distance of the extinguisher from the heat source is related to its effectiveness (success in extinguishing the fire).
@@ -624,9 +623,9 @@ rm(p1, p2)
 
 - It is observed that as the size of the fuel cans increases, there is a tendency for the failure rate to increase and the success rate to decrease in extinguishing the fire. However, this pattern isn't observed for sizes 6 and 7, which have 1026 records each, while for sizes 1 to 5 there are 3078 records each.
 
-# 5 -Data Preparation
+# 3 - Data Preparation
 
-## 5.1 Division of Data into Training and Test Sets
+## 3.1 Division of Data into Training and Test Sets
 
 ```{r}
 # Set a seed for reproducibility
@@ -639,7 +638,7 @@ rm(indexes)
 ```
 
 
-## 5.2 Rescaling
+## 3.2 Rescaling
 
 According to the univariate analysis of numerical variables (section 3.1), no variable has a normal or close to normal distribution. Min-Max normalization is more suitable when the data do not follow a normal distribution, thus preventing the data distribution from being distorted.
 
@@ -661,7 +660,7 @@ rm(num_cols, preprocess_obj)
 
 ```
 
-## 5.3 Encoding
+## 3.3 Encoding
 
 
 ```{r}
@@ -677,7 +676,7 @@ fuel_test_encoded <- as.data.frame(predict(dummy_obj, newdata = test_data))
 rm(dummy_obj)
 ```
 
-## 5.4 Concatenation
+## 3.4 Concatenation
 
 ```{r}
 # Concatenates the training data
@@ -697,9 +696,9 @@ rm(num_test_data_normalized, fuel_test_encoded)
 names(train_data)
 ```
 
-# 6 - Dimensionality reduction
+# 4 - Dimensionality reduction
 
-## 6.1 PCA
+## 4.1 PCA
 
 ```{r}
 # Remove the dependent variable from the training dataset
@@ -739,9 +738,9 @@ print(paste('The dimensionality reduction of the data was from', ncol(train_data
 ```
 
 
-# 07 - Modelagem de Machine Learning
+# 5 - Machine Learning Modeling
 
-## 7.1 - Random Model - Baseline
+## 5.1 - Random Model - Baseline
 
 ```{r}
 # Generating random predictions
@@ -753,7 +752,7 @@ cm_baseline <- confusionMatrix(test_data_pca$status, y_hat, mode = "prec_recall"
 cm_baseline
 ```
 
-## 7.2 - Logistic Regression
+## 5.2 - Logistic Regression
 
 ```{r}
 #  Cross validation with 5 folds
@@ -770,7 +769,7 @@ cm_glm <- confusionMatrix(test_data_pca$status, yhat_lr, mode = "prec_recall", p
 cm_glm
 ```
 
-## 7.3 - Decision Tree
+## 5.3 - Decision Tree
 
 ```{r}
 #  Cross validation with 5 folds
@@ -794,7 +793,7 @@ cm_rpart <- confusionMatrix(test_data_pca$status, yhat_dt, mode = "prec_recall",
 cm_rpart
 ```
 
-## 7.4 - K-Nearest Neighbors 
+## 5.4 - K-Nearest Neighbors 
 
 ```{r}
 #  Cross validation with 5 folds
@@ -817,7 +816,7 @@ cm_knn <- confusionMatrix(test_data_pca$status, yhat_knn, mode = "prec_recall", 
 cm_knn
 ```
 
-## 7.5 - Random Forest 
+## 5.5 - Random Forest 
 
 ```{r}
 # Cross validation with 5 folds
@@ -839,7 +838,7 @@ cm_rf <- confusionMatrix(test_data_pca$status, yhat_rf, mode = "prec_recall", po
 cm_rf
 ```
 
-## 7.6 - Neural Network - 1 Hidden Layer
+## 5.6 - Neural Network - 1 Hidden Layer
 ```{r}
 #  Cross validation with 5 folds
 ctrl <- trainControl(method = "cv", number = 5, verbose = FALSE)
@@ -862,7 +861,7 @@ cm_nnet
 ```
 
 
-## 7.7 - XGBoost
+## 5.7 - XGBoost
 
 ```{r}
 #  Cross validation with 5 folds
