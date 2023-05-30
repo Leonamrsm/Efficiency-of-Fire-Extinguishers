@@ -43,4 +43,6 @@ In order to solve this challenge, the work went along the following steps:
 4. **Dimensionality reduction:** Application of techniques that aim to reduce the number of variables or attributes of the input data, seeking to simplify and optimize the model learning process.
 5. **Machine Learning Modeling:** Implementation of some different models suitable for the classification task, fine-tuning their hyperparameters, using the cross-validation technique to train the models and compare their performances.
 
+## Exploratory Data Analysis
 
+During the exploratory data analysis several hypotheses were tested. Below are some of the hypotheses that were tested:
