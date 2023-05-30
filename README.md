@@ -46,3 +46,10 @@ In order to solve this challenge, the work went along the following steps:
 ## Exploratory Data Analysis
 
 During the exploratory data analysis several hypotheses were tested. Below are some of the hypotheses that were tested:
+
+- **Hypothesis 1:** The distance of the extinguisher from the heat source is related to its effectiveness (success in extinguishing the fire).
+   
+
+![](img/H1.png)
+
+From the graphs, it can be seen that as the distance increases, the proportion of cases of failure increase and the proportion of cases of success decrease.
