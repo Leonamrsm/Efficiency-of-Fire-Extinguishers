@@ -9,14 +9,14 @@ The fundamental principle behind sound wave fire-extinguishing systems involves 
 
 These systems offer several advantages compared to conventional fire-extinguishing methods. Some of the benefits include:
 
-Waterless operation: Sound wave fire-extinguishing systems do not rely on water or chemical agents, eliminating the risks associated with water damage or chemical contamination.
+1. Waterless operation: Sound wave fire-extinguishing systems do not rely on water or chemical agents, eliminating the risks associated with water damage or chemical contamination.
 
-Rapid activation: These systems can be activated quickly, detecting fires early and initiating extinguishing action promptly.
+2. Rapid activation: These systems can be activated quickly, detecting fires early and initiating extinguishing action promptly.
 
-Enhanced safety: As there is no direct contact with flames or the use of hazardous chemicals, the safety of firefighters and other individuals involved is increased.
+3. Enhanced safety: As there is no direct contact with flames or the use of hazardous chemicals, the safety of firefighters and other individuals involved is increased.
 
-Reduced property damage: The absence of water or chemicals minimizes the potential for damage to property, such as sensitive electronic equipment, documents, and structures.
+4. Reduced property damage: The absence of water or chemicals minimizes the potential for damage to property, such as sensitive electronic equipment, documents, and structures.
 
-Efficiency in confined spaces: Sound wave fire-extinguishing systems can be particularly effective in confined spaces where traditional methods may be more challenging to apply.
+5. Efficiency in confined spaces: Sound wave fire-extinguishing systems can be particularly effective in confined spaces where traditional methods may be more challenging to apply.
 
 It's important to note that sound wave fire-extinguishing systems are still undergoing research and development. While they show promise, further studies and testing are needed to validate their effectiveness in different fire scenarios and environments. Additionally, regulations and standards need to be established to ensure their safe and reliable implementation.
