@@ -77,3 +77,19 @@ It is observed that there are cases of success and failure in the entire frequen
 ![](img/H5.png)
 
 From the graphs, it can be seen that Gasoline and lpg have more success than failures. Kerosene and Thinner present more cases of failure than success in extinguishing fires.
+
+## Machine Learning Modeling Performance
+Six different models were evaluated using cross-validation with 5 folds using caret library. When training a model using caret with cross-validation (cv), the final model is the result of aggregating each model trained on a different fold. Additionally, during the model training with cross-validation, multiple different values of hyperparameters were evaluated. This process involved fine-tuning the hyperparameters, resembling a grid-search, but with the advantage that the specific values tested for each hyperparameter are automatically chosen by the caret package during the training.
+Before training the models, the database was divided as follows: 80% for training and 20% for testing. The results obtained are summarized in the table below:
+
+|Model|Accuracy|F1.Score|Precision|Recall| AUC|
+|--------------------------------|---------|--------|----------|--------------|-----------------|
+|Logistic Regression             |0.902	   |0.900   |0.887	   |0.912         |0.971            |
+|Decision Tree                   |0.919	   |0.918	  |0.914     |0.921         |0.957            |
+|K-Nearest Neighbors             |0.970    |0.970   |0.969     |0.971         |0.993            |
+|Random Forest                   |0.966    |0.966   |0.961     |0.971         |0.995            |
+|Neural Network - 1 Hidden Layer |0.947	   |0.947   |0.941	   |0.952         |0.991            |
+|XGBoost                         |0.966    |0.966   |0.962     |0.969         |0.995            |
+
+
+
