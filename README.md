@@ -91,5 +91,5 @@ Before training the models, the database was divided as follows: 80% for trainin
 |Neural Network - 1 Hidden Layer |0.947	   |0.947   |0.941	   |0.952         |0.991            |
 |XGBoost                         |0.966    |0.966   |0.962     |0.969         |0.995            |
 
-
+Below is the ROC curve obtained with each model.
 
