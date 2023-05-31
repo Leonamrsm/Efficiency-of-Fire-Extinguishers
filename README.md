@@ -94,3 +94,6 @@ Before training the models, the database was divided as follows: 80% for trainin
 Below is the ROC curve obtained with each model.
 
 ![](img/rocCurves.png)
+
+
+The Random Forest and XGBoost models presented the best f1.score and AUC metrics.
