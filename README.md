@@ -93,3 +93,4 @@ Before training the models, the database was divided as follows: 80% for trainin
 
 Below is the ROC curve obtained with each model.
 
+![](img/rocCurves.png)
